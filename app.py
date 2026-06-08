@@ -4,7 +4,7 @@ from pricing import calculate_price, acceptance_probability
 
 st.set_page_config(
     page_title="СКС Ломбард — Оценка ювелирных изделий",
-    page_icon="💍",
+    page_icon="https://sks-lombard.ru/local/templates/sks-lombard/assets/images/favicon/icon1.ico",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -12,13 +12,12 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* ===== Фирменная палитра СКС Ломбард (светлый + красный) ===== */
     :root {
-        --red:         #e30613;   /* фирменный красный */
+        --red:         #e30613; 
         --red-dark:    #b00410;
         --red-light:   #ff4b57;
         --bg:          #ffffff;
-        --bg-soft:     #fbf2ee;   /* светло-бежевый/розоватый */
+        --bg-soft:     #fbf2ee; 
         --bg-card:     #ffffff;
         --border:      #ececec;
         --text:        #2b2b2b;
@@ -193,9 +192,9 @@ st.markdown(
 st.markdown(
     """
     <div class="brand-bar">
-        <div class="brand-logo">СКС</div>
+        <img src="https://sks-lombard.ru/local/templates/sks-lombard/assets/images/favicon/icon1.ico" class="brand-logo" alt="СКС">
         <div class="brand-text">
-            <h1>СКС Ломбард — Уфа</h1>
+            <h1>СКС Ломбард</h1>
             <div class="sub">Предварительная оценка ювелирных изделий по фотографиям</div>
         </div>
     </div>
