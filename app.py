@@ -13,75 +13,223 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-:root {
-    --red:        #e30613;
-    --red-dark:   #b00410;
-    --bg:         #ffffff;
-    --bg-soft:    #ffffff;
-    --bg-card:    #ffffff;
-    --border:     #ececec;
-    --text:       #2b2b2b;
-    --text-muted: #888888;
-}
-#MainMenu, footer {visibility: hidden;}
-.stApp { background: var(--bg); }
-.block-container { padding-top: 1.2rem; max-width: 1150px; }
-.brand-bar {
-    background: #fff; border: 1px solid var(--border);
-    border-bottom: 3px solid var(--red); border-radius: 14px;
-    padding: 1.4rem 1.8rem; margin-bottom: 1.4rem;
-    display: flex; align-items: center; gap: 1.1rem;
-    box-shadow: 0 4px 18px rgba(0,0,0,.05);
-}
-.responsive-value {
-    font-size: clamp(12px, 2.5vw, 16px);
-    word-break: break-word;
-}
-.brand-logo {
-    width:58px; height:58px; min-width:58px; border-radius:12px;
-    background:var(--red); display:flex; align-items:center;
-    justify-content:center; font-weight:800; font-size:1.25rem;
-    color:#fff; letter-spacing:1px; box-shadow:0 2px 8px rgba(227,6,19,.3);
-}
-.brand-text h1  { color:var(--text); font-size:1.55rem; margin:0; font-weight:800; }
-.brand-text .sub{ color:var(--text-muted); font-size:.92rem; margin-top:.15rem; }
-.card {
-    background:var(--bg-card); border:1px solid var(--border);
-    border-top:3px solid var(--red); border-radius:12px;
-    padding:1.5rem 1.5rem 1.2rem; box-shadow:0 2px 10px rgba(0,0,0,.04);
-    margin-bottom:1.2rem;
-}
-.card h3 {
-    font-size:1.12rem; margin-top:0; color:var(--text);
-    border-left:4px solid var(--red); padding-left:.65rem;
-    margin-bottom:1.1rem; font-weight:700;
-}
-.metric-box {
-    background:var(--bg-soft); border:1px solid var(--border);
-    border-radius:10px; padding:1rem 1.2rem; text-align:center; height:100%;
-}
-.metric-box .label { font-size:.78rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.6px; }
-.metric-box .value { font-size:1rem; font-weight:800; color:var(--text); margin-top:.35rem; }
-.badge { display:inline-block; padding:.35rem .9rem; border-radius:20px; font-weight:600; font-size:.95rem; }
-.badge-high   { background:#e3f5e8; color:#1b7a3d; }
-.badge-medium { background:#fff4e0; color:#a76a00; }
-.badge-low    { background:#fde8e8; color:#b42318; }
-.conf { display:inline-block; padding:.15rem .6rem; border-radius:14px; font-size:.78rem; font-weight:600; margin-left:.4rem; }
-.conf-high   { background:#e3f5e8; color:#1b7a3d; }
-.conf-medium { background:#fff4e0; color:#a76a00; }
-.conf-low    { background:#fde8e8; color:#b42318; }
-.conf-na     { background:#eceff3; color:#6b7280; }
-.stButton > button, .stFormSubmitButton > button {
-    background:var(--red); color:#fff; border:none; border-radius:8px;
-    padding:.65rem 1.4rem; font-weight:700; font-size:1rem; width:100%;
-    transition:all .2s ease;
-}
-.stButton > button:hover, .stFormSubmitButton > button:hover {
-    background:var(--red-dark); color:#fff;
-    box-shadow:0 3px 12px rgba(227,6,19,.3);
-}
-.weight-note { font-size:.85rem; color:var(--text-muted); margin-top:.4rem; }
-.convert-section { border-top: 2px solid var(--border); margin-top: 1.4rem; padding-top: 1.2rem; }
+    /* Сброс стилей Streamlit */
+    .stApp {
+        background: #ffffff !important;
+    }
+    
+    /* Переменные */
+    :root {
+        --red: #e30613;
+        --red-dark: #b00410;
+        --bg: #ffffff;
+        --bg-soft: #fafafa;
+        --bg-card: #ffffff;
+        --border: #e5e7eb;
+        --text: #1f2937;
+        --text-muted: #6b7280;
+    }
+    
+    /* Скрываем меню и футер */
+    #MainMenu {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    
+    /* Основной контейнер */
+    .block-container {
+        padding-top: 1.2rem !important;
+        max-width: 1150px !important;
+    }
+    
+    /* Бренд-бар */
+    .brand-bar {
+        background: #ffffff !important;
+        border: 1px solid var(--border) !important;
+        border-bottom: 3px solid var(--red) !important;
+        border-radius: 14px !important;
+        padding: 1.4rem 1.8rem !important;
+        margin-bottom: 1.4rem !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 1.1rem !important;
+        box-shadow: 0 4px 18px rgba(0,0,0,.05) !important;
+    }
+    
+    .brand-logo {
+        width: 58px !important;
+        height: 58px !important;
+        min-width: 58px !important;
+        border-radius: 12px !important;
+        background: var(--red) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 800 !important;
+        font-size: 1.25rem !important;
+        color: #ffffff !important;
+        letter-spacing: 1px !important;
+        box-shadow: 0 2px 8px rgba(227,6,19,.3) !important;
+    }
+    
+    .brand-text h1 {
+        color: var(--text) !important;
+        font-size: 1.55rem !important;
+        margin: 0 !important;
+        font-weight: 800 !important;
+    }
+    
+    .brand-text .sub {
+        color: var(--text-muted) !important;
+        font-size: .92rem !important;
+        margin-top: .15rem !important;
+    }
+    
+    /* Карточки */
+    .card {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border) !important;
+        border-top: 3px solid var(--red) !important;
+        border-radius: 12px !important;
+        padding: 1.5rem 1.5rem 1.2rem !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,.04) !important;
+        margin-bottom: 1.2rem !important;
+    }
+    
+    .card h3 {
+        font-size: 1.12rem !important;
+        margin-top: 0 !important;
+        color: var(--text) !important;
+        border-left: 4px solid var(--red) !important;
+        padding-left: .65rem !important;
+        margin-bottom: 1.1rem !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Метрики */
+    .metric-box {
+        background: var(--bg-soft) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        padding: 1rem 1.2rem !important;
+        text-align: center !important;
+        height: 100% !important;
+    }
+    
+    .metric-box .label {
+        font-size: .78rem !important;
+        color: var(--text-muted) !important;
+        text-transform: uppercase !important;
+        letter-spacing: .6px !important;
+    }
+    
+    .metric-box .value {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+        color: var(--text) !important;
+        margin-top: .35rem !important;
+    }
+    
+    /* Бейджи */
+    .badge {
+        display: inline-block !important;
+        padding: .35rem .9rem !important;
+        border-radius: 20px !important;
+        font-weight: 600 !important;
+        font-size: .95rem !important;
+    }
+    
+    .badge-high { background: #e3f5e8 !important; color: #1b7a3d !important; }
+    .badge-medium { background: #fff4e0 !important; color: #a76a00 !important; }
+    .badge-low { background: #fde8e8 !important; color: #b42318 !important; }
+    
+    .conf {
+        display: inline-block !important;
+        padding: .15rem .6rem !important;
+        border-radius: 14px !important;
+        font-size: .78rem !important;
+        font-weight: 600 !important;
+        margin-left: .4rem !important;
+    }
+    
+    .conf-high { background: #e3f5e8 !important; color: #1b7a3d !important; }
+    .conf-medium { background: #fff4e0 !important; color: #a76a00 !important; }
+    .conf-low { background: #fde8e8 !important; color: #b42318 !important; }
+    .conf-na { background: #eceff3 !important; color: #6b7280 !important; }
+    
+    /* Кнопки - ИСПРАВЛЕНО */
+    .stButton > button {
+        background-color: var(--red) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.65rem 1.4rem !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        width: 100% !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .stButton > button:hover {
+        background-color: var(--red-dark) !important;
+        color: #ffffff !important;
+        box-shadow: 0 3px 12px rgba(227,6,19,.3) !important;
+        border: none !important;
+    }
+    
+    /* Кнопки в формах */
+    .stFormSubmitButton > button {
+        background-color: var(--red) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.65rem 1.4rem !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        width: 100% !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .stFormSubmitButton > button:hover {
+        background-color: var(--red-dark) !important;
+        color: #ffffff !important;
+        box-shadow: 0 3px 12px rgba(227,6,19,.3) !important;
+        border: none !important;
+    }
+    
+    /* Дополнительные стили */
+    .weight-note {
+        font-size: .85rem !important;
+        color: var(--text-muted) !important;
+        margin-top: .4rem !important;
+    }
+    
+    .convert-section {
+        border-top: 2px solid var(--border) !important;
+        margin-top: 1.4rem !important;
+        padding-top: 1.2rem !important;
+    }
+    
+    .reason-item {
+        padding: 0.3rem 0;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+    
+    /* Переопределение стилей Streamlit для selectbox, input и radio */
+    .stSelectbox div[data-baseweb="select"] > div {
+        border-radius: 8px !important;
+        border-color: var(--border) !important;
+    }
+    
+    .stNumberInput input {
+        border-radius: 8px !important;
+        border-color: var(--border) !important;
+    }
+    
+    /* Адаптивный текст */
+    .responsive-value {
+        font-size: clamp(12px, 2.5vw, 16px) !important;
+        word-break: break-word !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
