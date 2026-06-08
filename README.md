@@ -90,6 +90,7 @@ ai-lombard/
 ├── pricing.py
 ├── README.md
 └── requirements.txt
+```
 
 Назначение файлов
 
