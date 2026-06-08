@@ -1,4 +1,3 @@
-# pricing.py
 import os
 from dotenv import load_dotenv
 
@@ -28,6 +27,7 @@ def normalize_item_type(item_type: str) -> str:
     t = str(item_type).strip().lower()
     return t if t in ITEM_TYPES else "—"
 
+
 def determine_category(condition: str) -> str:
     cond = str(condition).strip().lower()
     if cond in ("плохое", "плохая", "плохой"):
@@ -36,64 +36,73 @@ def determine_category(condition: str) -> str:
         return "cat2"
     return "cat1"
 
+
 def calculate_price(form_data: dict) -> dict:
     """
     Рассчитывает предварительную стоимость изделия.
 
     form_data ожидает:
-      item_type (str)   — тип изделия (кольцо, серьги, браслет, кулон, цепь, колье)
+      item_type (str)   — тип изделия
       fineness (str)    — проба ("375", "585", "750")
-      has_inserts (bool)— наличие вставок (да/нет)
+      has_inserts (bool)— наличие вставок
       condition (str)   — состояние ("как новое" / "среднее" / "плохое")
       weight (float)    — вес в граммах (необязательное поле)
     """
-    item_type = normalize_item_type(form_data.get("item_type", ""))
+    item_type    = normalize_item_type(form_data.get("item_type", ""))
     fineness_key = form_data.get("fineness", "585")
-    has_inserts = bool(form_data.get("has_inserts", False))
-    condition = form_data.get("condition", "среднее")
+    has_inserts  = bool(form_data.get("has_inserts", False))
+    condition    = form_data.get("condition", "среднее")
 
     weight_raw = form_data.get("weight", None)
     weight = float(weight_raw) if weight_raw not in (None, "", 0) else 0.0
 
-    category = determine_category(condition)
+    category      = determine_category(condition)
     price_per_gram = TARIFFS[fineness_key][category]
 
-    total = round(price_per_gram * weight) if weight > 0 else None
+    if weight > 0:
+        loan_amount  = round(price_per_gram * weight)
+        buyout_amount = loan_amount
+    else:
+        loan_amount   = None
+        buyout_amount = None
 
     return {
-        "item_type": item_type,
-        "fineness_key": fineness_key,
-        "has_inserts": has_inserts,
-        "condition": condition,
+        "item_type":      item_type,
+        "fineness_key":   fineness_key,
+        "has_inserts":    has_inserts,
+        "condition":      condition,
         "price_per_gram": price_per_gram,
-        "weight": weight,
-        "total": total,  # None, если вес не указан
+        "weight":         weight,
+        "loan_amount":    loan_amount,
+        "buyout_amount":  buyout_amount,
     }
 
-# страховочные ключевые слова критичных дефектов (если ИИ не выставил severity)
+
+# страховочные ключевые слова критичных дефектов
 CRITICAL_DEFECT_KEYWORDS = (
     "разлом", "разорван", "разрыв", "сломан", "трещина", "треснут",
-    "деформац", "погнут", "оплавлен", "расплавлен", "отсутству",
+    "деформация", "погнут", "оплавлен", "расплавлен", "отсутству",
     "обломан", "обрыв", "порван", "распил", "распаян", "лопнул",
 )
+
 
 def _looks_critical(text: str) -> bool:
     t = str(text).strip().lower()
     return any(k in t for k in CRITICAL_DEFECT_KEYWORDS)
 
+
 def acceptance_probability(form_data: dict) -> dict:
     """Оценивает вероятность приёма изделия (0..100%)."""
-    score = 100
+    score   = 100
     reasons = []
 
-    condition = str(form_data.get("condition", "среднее")).strip().lower()
-    severity = str(form_data.get("defect_severity", "нет")).strip().lower()
-    repairable = bool(form_data.get("repairable", True))
-    has_defects = bool(form_data.get("has_defects", False))
-    insert_damage = bool(form_data.get("insert_damage", False))
+    condition           = str(form_data.get("condition", "среднее")).strip().lower()
+    severity            = str(form_data.get("defect_severity", "нет")).strip().lower()
+    repairable          = bool(form_data.get("repairable", True))
+    has_defects         = bool(form_data.get("has_defects", False))
+    insert_damage       = bool(form_data.get("insert_damage", False))
     defects_description = str(form_data.get("defects_description", ""))
 
-    # страховка: если описание явно критичное, повышаем severity
     if severity != "критичный" and _looks_critical(defects_description):
         severity = "критичный"
 
@@ -107,8 +116,7 @@ def acceptance_probability(form_data: dict) -> dict:
 
     # --- Серьёзность дефектов ---
     descr = (defects_description
-             if defects_description and defects_description != "—"
-             else "")
+             if defects_description and defects_description != "—" else "")
     if severity == "критичный":
         score -= 75
         reasons.append(
@@ -122,7 +130,6 @@ def acceptance_probability(form_data: dict) -> dict:
         score -= 10
         reasons.append(f"Незначительные дефекты: {descr}" if descr else "Мелкие дефекты")
     elif has_defects:
-        # severity не пришла, но дефекты есть
         score -= 25
         reasons.append(f"Дефекты: {descr}" if descr else "Видимые дефекты")
 
@@ -159,6 +166,6 @@ def acceptance_probability(form_data: dict) -> dict:
 
     return {
         "probability": score,
-        "verdict": verdict,
-        "reasons": reasons or ["Замечаний не выявлено"],
+        "verdict":     verdict,
+        "reasons":     reasons or ["Замечаний не выявлено"],
     }

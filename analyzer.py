@@ -117,7 +117,6 @@ def _normalize(data: dict, form_data: dict) -> dict:
         weight_source = "оценка по фото"
         weight_confidence = data.get("weight_confidence") or "низкая"
 
-    # нормализуем серьёзность дефекта
     severity = str(data.get("defect_severity", "нет")).strip().lower()
     if severity not in ("нет", "незначительный", "средний", "критичный"):
         severity = "нет"
@@ -132,7 +131,6 @@ def _normalize(data: dict, form_data: dict) -> dict:
         "repairable": bool(data.get("repairable", True)),
         "insert_damage": bool(data.get("insert_damage", False)),
         "visual_notes": data.get("visual_notes") or "—",
-        # --- блок веса ---
         "estimated_weight_g": final_weight,
         "weight_min_g": w_min,
         "weight_max_g": w_max,
@@ -155,7 +153,6 @@ def _fallback(form_data: dict) -> dict:
         "repairable": True,
         "insert_damage": False,
         "visual_notes": "—",
-        # --- блок веса ---
         "estimated_weight_g": form_weight,
         "weight_min_g": form_weight,
         "weight_max_g": form_weight,
