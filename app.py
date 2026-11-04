@@ -1,277 +1,379 @@
-# app.py
 import re
 from html import escape
 
 import streamlit as st
+
 from analyzer import analyze_jewelry
 from bitrix import create_deal
 from config import settings
 from pricing import acceptance_probability, calculate_price
 
 st.set_page_config(
-    page_title="СКС Ломбард — Оценка ювелирных изделий",
-    page_icon="https://sks-lombard.ru/local/templates/sks-lombard/assets/images/favicon/icon1.ico",
+    page_title="СКС Ломбард — Оценка украшений",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
+st.markdown(
+    """
 <style>
-    /* Сброс стилей Streamlit */
-    .stApp {
-        background: #ffffff !important;
-    }
-    
-    /* Переменные */
     :root {
-        --red: #e30613;
-        --red-dark: #b00410;
-        --bg: #ffffff;
-        --bg-soft: #fafafa;
-        --bg-card: #ffffff;
-        --border: #e5e7eb;
-        --text: #1f2937;
-        --text-muted: #6b7280;
+        --canvas: #f8fafc;
+        --paper: #ffffff;
+        --ink: #020617;
+        --muted: #475569;
+        --quiet: #64748b;
+        --line: #e2e8f0;
+        --soft: #e8ecf1;
+        --accent: #0f172a;
+        --accent-hover: #334155;
+        --gold: #0369a1;
+        --positive-bg: #edf5ef;
+        --positive-ink: #23623b;
+        --medium-bg: #fbf1de;
+        --medium-ink: #87570c;
+        --low-bg: #f8eae7;
+        --low-ink: #a23e31;
     }
-    
-    /* Скрываем меню и футер */
-    #MainMenu {visibility: hidden !important;}
-    footer {visibility: hidden !important;}
-    
-    /* Основной контейнер */
+
+    #MainMenu, footer { visibility: hidden !important; }
+
+    .stApp {
+        background: var(--canvas) !important;
+        color: var(--ink) !important;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
     .block-container {
-        padding-top: 1.2rem !important;
-        max-width: 1150px !important;
+        max-width: 1160px !important;
+        padding: 1.25rem 1.25rem 4rem !important;
     }
-    
-    /* Бренд-бар */
-    .brand-bar {
-        background: #ffffff !important;
-        border: 1px solid var(--border) !important;
-        border-bottom: 3px solid var(--red) !important;
-        border-radius: 14px !important;
-        padding: 1.4rem 1.8rem !important;
-        margin-bottom: 1.4rem !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 1.1rem !important;
-        box-shadow: 0 4px 18px rgba(0,0,0,.05) !important;
+
+    .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 4rem;
+        margin-bottom: 3.75rem;
+        border-bottom: 1px solid var(--line);
     }
-    
-    .brand-logo {
-        width: 58px !important;
-        height: 58px !important;
-        min-width: 58px !important;
-        border-radius: 12px !important;
-        background: var(--red) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-weight: 800 !important;
-        font-size: 1.25rem !important;
-        color: #ffffff !important;
-        letter-spacing: 1px !important;
-        box-shadow: 0 2px 8px rgba(227,6,19,.3) !important;
+
+    .wordmark {
+        display: inline-flex;
+        align-items: center;
+        gap: .7rem;
+        color: var(--ink);
+        font-size: .84rem;
+        font-weight: 750;
+        letter-spacing: .01em;
     }
-    
-    .brand-text h1 {
-        color: var(--text) !important;
-        font-size: 1.55rem !important;
-        margin: 0 !important;
-        font-weight: 800 !important;
+
+    .wordmark-mark {
+        display: grid;
+        place-items: center;
+        width: 1.6rem;
+        height: 1.6rem;
+        border-radius: 5px;
+        background: var(--accent);
     }
-    
-    .brand-text .sub {
-        color: var(--text-muted) !important;
-        font-size: .92rem !important;
-        margin-top: .15rem !important;
+
+    .wordmark-mark svg { width: .86rem; height: .86rem; fill: #fff; }
+
+    .topbar-note {
+        color: var(--muted);
+        font-size: .76rem;
+        font-weight: 600;
     }
-    
-    /* Карточки */
-    .card {
-        background: var(--bg-card) !important;
-        border: 1px solid var(--border) !important;
-        border-top: 3px solid var(--red) !important;
-        border-radius: 12px !important;
-        padding: 1.5rem 1.5rem 1.2rem !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,.04) !important;
-        margin-bottom: 1.2rem !important;
+
+    .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 2rem;
+        margin-bottom: 3.25rem;
     }
-    
-    .card h3 {
-        font-size: 1.12rem !important;
-        margin-top: 0 !important;
-        color: var(--text) !important;
-        border-left: 4px solid var(--red) !important;
-        padding-left: .65rem !important;
-        margin-bottom: 1.1rem !important;
-        font-weight: 700 !important;
+
+    .eyebrow {
+        margin: 0 0 .85rem;
+        color: var(--gold);
+        font-size: .68rem;
+        font-weight: 800;
+        letter-spacing: .12em;
+        text-transform: uppercase;
     }
-    
-    /* Метрики */
-    .metric-box {
-        background: var(--bg-soft) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 10px !important;
-        padding: 1rem 1.2rem !important;
-        text-align: center !important;
-        height: 100% !important;
+
+    .hero h1 {
+        max-width: 52rem;
+        margin: 0;
+        color: var(--ink);
+        font-family: Iowan Old Style, Baskerville, Georgia, serif;
+        font-size: clamp(2.6rem, 6.2vw, 5.3rem);
+        font-weight: 500;
+        letter-spacing: -.065em;
+        line-height: .94;
     }
-    
-    .metric-box .label {
-        font-size: .78rem !important;
-        color: var(--text-muted) !important;
-        text-transform: uppercase !important;
-        letter-spacing: .6px !important;
+
+    .hero h1 em { color: var(--gold); font-style: normal; }
+
+    .hero-copy {
+        max-width: 38rem;
+        margin: 1.3rem 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.65;
     }
-    
-    .metric-box .value {
-        font-size: 1.2rem !important;
-        font-weight: 800 !important;
-        color: var(--text) !important;
-        margin-top: .35rem !important;
+
+    .trust-list {
+        display: grid;
+        gap: .7rem;
+        min-width: 13.5rem;
+        padding: 1rem 0 0 1.35rem;
+        border-left: 1px solid var(--line);
     }
-    
-    /* Бейджи */
-    .badge {
-        display: inline-block !important;
-        padding: .35rem .9rem !important;
-        border-radius: 20px !important;
-        font-weight: 600 !important;
-        font-size: .95rem !important;
+
+    .trust-item { color: var(--muted); font-size: .76rem; line-height: 1.35; }
+    .trust-item strong { display: block; color: var(--ink); font-size: .8rem; font-weight: 700; }
+
+    .workflow {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        margin: 0 0 2rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--paper);
     }
-    
-    .badge-high { background: #e3f5e8 !important; color: #1b7a3d !important; }
-    .badge-medium { background: #fff4e0 !important; color: #a76a00 !important; }
-    .badge-low { background: #fde8e8 !important; color: #b42318 !important; }
-    
-    .conf {
-        display: inline-block !important;
-        padding: .15rem .6rem !important;
-        border-radius: 14px !important;
-        font-size: .78rem !important;
-        font-weight: 600 !important;
-        margin-left: .4rem !important;
+
+    .workflow-step {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        padding: .9rem 1rem;
+        border-right: 1px solid var(--line);
+        color: var(--muted);
+        font-size: .76rem;
+        font-weight: 600;
     }
-    
-    .conf-high { background: #e3f5e8 !important; color: #1b7a3d !important; }
-    .conf-medium { background: #fff4e0 !important; color: #a76a00 !important; }
-    .conf-low { background: #fde8e8 !important; color: #b42318 !important; }
-    .conf-na { background: #eceff3 !important; color: #6b7280 !important; }
-    
-    /* Кнопки - ИСПРАВЛЕНО */
-    .stButton > button {
-        background-color: var(--red) !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 0.65rem 1.4rem !important;
-        font-weight: 700 !important;
-        font-size: 1rem !important;
-        width: 100% !important;
-        transition: all 0.2s ease !important;
+
+    .workflow-step:last-child { border-right: 0; }
+    .step-index {
+        display: grid;
+        place-items: center;
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 50%;
+        background: var(--soft);
+        color: var(--ink);
+        font-size: .68rem;
+        font-weight: 800;
     }
-    
-    .stButton > button:hover {
-        background-color: var(--red-dark) !important;
-        color: #ffffff !important;
-        box-shadow: 0 3px 12px rgba(227,6,19,.3) !important;
-        border: none !important;
+
+    .panel {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 1.55rem;
     }
-    
-    /* Кнопки в формах */
-    .stFormSubmitButton > button {
-        background-color: var(--red) !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 0.65rem 1.4rem !important;
-        font-weight: 700 !important;
-        font-size: 1rem !important;
-        width: 100% !important;
-        transition: all 0.2s ease !important;
+
+    .panel-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
     }
-    
-    .stFormSubmitButton > button:hover {
-        background-color: var(--red-dark) !important;
-        color: #ffffff !important;
-        box-shadow: 0 3px 12px rgba(227,6,19,.3) !important;
-        border: none !important;
+
+    .panel-title {
+        margin: 0;
+        color: var(--ink);
+        font-size: 1rem;
+        font-weight: 720;
+        letter-spacing: -.025em;
     }
-    
-    /* Дополнительные стили */
-    .weight-note {
-        font-size: .85rem !important;
-        color: var(--text-muted) !important;
-        margin-top: .4rem !important;
+
+    .panel-caption { margin: .35rem 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+    .panel-index { color: var(--quiet); font-size: .72rem; font-weight: 750; letter-spacing: .08em; }
+
+    .form-section-label {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        margin: 1.65rem 0 .85rem;
+        color: var(--ink);
+        font-size: .78rem;
+        font-weight: 750;
     }
-    
-    .convert-section {
-        border-top: 2px solid var(--border) !important;
-        margin-top: 1.4rem !important;
-        padding-top: 1.2rem !important;
+
+    .form-section-label::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+
+    .result-empty {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-height: 29rem;
+        padding: 1.7rem;
+        border: 1px dashed #cfcac2;
+        border-radius: 12px;
+        background: linear-gradient(140deg, #fff 0%, #f1f5f9 100%);
     }
-    
-    .reason-item {
-        padding: 0.3rem 0;
-        color: var(--text-muted);
-        font-size: 0.9rem;
+
+    .result-empty-number { color: #d4d0c8; font-family: Georgia, serif; font-size: 5rem; line-height: .8; }
+    .result-empty h2 { max-width: 17rem; margin: 1.2rem 0 .5rem; color: var(--ink); font-family: Georgia, serif; font-size: 1.65rem; font-weight: 500; letter-spacing: -.04em; }
+    .result-empty p { max-width: 20rem; margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+
+    .result-card {
+        overflow: hidden;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 12px;
     }
-    
-    /* Переопределение стилей Streamlit для selectbox, input и radio */
-    .stSelectbox div[data-baseweb="select"] > div {
-        border-radius: 8px !important;
-        border-color: var(--border) !important;
+
+    .result-main {
+        padding: 1.65rem;
+        background: var(--accent);
+        color: #fff;
     }
-    
-    .stNumberInput input {
-        border-radius: 8px !important;
-        border-color: var(--border) !important;
+    .result-kicker { margin: 0 0 .7rem; color: #cbd5e1; font-size: .7rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .result-value {
+        margin: 0;
+        color: #fff;
+        font-family: Iowan Old Style, Baskerville, Georgia, serif;
+        font-size: clamp(3.2rem, 6vw, 4.9rem);
+        font-variant-numeric: tabular-nums;
+        font-weight: 500;
+        letter-spacing: -.075em;
+        line-height: .9;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, .18);
     }
-    
-    /* Адаптивный текст */
-    .responsive-value {
-        font-size: clamp(12px, 2.5vw, 16px) !important;
-        word-break: break-word !important;
+    .result-subtitle { max-width: 29rem; margin: .9rem 0 0; color: #cbd5e1; font-size: .84rem; line-height: 1.5; }
+
+    .result-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .result-stat { min-width: 0; padding: 1rem; border-right: 1px solid var(--line); }
+    .result-stat:last-child { border-right: 0; }
+    .result-stat-label { display: block; color: var(--muted); font-size: .64rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+    .result-stat-value { display: block; margin-top: .38rem; color: var(--ink); font-size: .9rem; font-weight: 700; overflow-wrap: anywhere; }
+
+    .result-insight { padding: 1.15rem 1.55rem; background: #fcfcfb; }
+    .result-insight p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
+
+    .badge, .conf {
+        display: inline-block;
+        border-radius: 999px;
+        font-weight: 700;
+        letter-spacing: -.01em;
+    }
+    .badge { padding: .38rem .7rem; font-size: .8rem; }
+    .conf { margin-left: .3rem; padding: .16rem .5rem; font-size: .7rem; }
+    .badge-high, .conf-high { background: var(--positive-bg); color: var(--positive-ink); }
+    .badge-medium, .conf-medium { background: var(--medium-bg); color: var(--medium-ink); }
+    .badge-low, .conf-low { background: var(--low-bg); color: var(--low-ink); }
+    .conf-na { background: var(--soft); color: var(--muted); }
+
+    .reason-list { display: grid; gap: .5rem; margin-top: .9rem; }
+    .reason-item { padding-left: .8rem; border-left: 2px solid #d5d0c7; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+
+    .lead-card {
+        margin-top: 1.25rem;
+        margin-bottom: .85rem;
+        padding: 1.35rem;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--ink);
+    }
+    .lead-card h3 { margin: 0; font-family: Georgia, serif; font-size: 1.35rem; font-weight: 500; letter-spacing: -.035em; }
+    .lead-card p { margin: .45rem 0 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+    .lead-actions { margin-top: .2rem; }
+
+    .stButton > button, .stFormSubmitButton > button {
+        width: 100%;
+        min-height: 2.85rem;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 7px !important;
+        background: #fff !important;
+        color: var(--ink) !important;
+        font-size: .87rem;
+        font-weight: 700;
+        transition: transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+
+    .stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
+        border-color: var(--accent) !important;
+        background: var(--accent) !important;
+        color: #fff !important;
+    }
+
+    .stButton > button:hover, .stFormSubmitButton > button:hover { border-color: var(--accent-hover) !important; background: #f1f5f9 !important; transform: translateY(-1px); box-shadow: none !important; }
+    .stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover { background: var(--accent-hover) !important; color: #fff !important; }
+    .stButton > button:focus-visible, .stFormSubmitButton > button:focus-visible {
+        outline: 3px solid #0369a1 !important;
+        outline-offset: 3px;
+    }
+
+    .stSelectbox div[data-baseweb="select"] > div, .stNumberInput input, .stTextInput input {
+        min-height: 2.75rem;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 7px !important;
+        background: #fff !important;
+        color: var(--ink) !important;
+        box-shadow: none !important;
+    }
+    .stSelectbox div[data-baseweb="select"] > div:focus-within, .stNumberInput input:focus, .stTextInput input:focus {
+        border-color: #0369a1 !important;
+        box-shadow: 0 0 0 3px rgba(3, 105, 161, .24) !important;
+    }
+    [data-testid="stWidgetLabel"] p { color: var(--ink) !important; font-size: .82rem !important; font-weight: 650 !important; }
+    [data-testid="stFileUploader"] { padding: .3rem; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; }
+    [data-testid="stFileUploader"] section { border: 0 !important; background: transparent !important; }
+    [data-testid="stAlert"], [data-testid="stExpander"] { border: 1px solid var(--line) !important; border-radius: 8px !important; box-shadow: none !important; }
+    [data-testid="stExpander"] { background: var(--paper) !important; }
+    .stCaption { color: var(--muted) !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            scroll-behavior: auto !important;
+            transition-duration: .01ms !important;
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+        }
+    }
+
+    @media (max-width: 800px) {
+        .block-container { padding: .75rem 1rem 3rem !important; }
+        .topbar { margin-bottom: 2.4rem; }
+        .topbar-note { display: none; }
+        .hero { grid-template-columns: 1fr; gap: 1.25rem; margin-bottom: 2rem; }
+        .hero h1 { font-size: clamp(2.45rem, 14vw, 4rem); }
+        .trust-list { grid-template-columns: repeat(3, 1fr); min-width: 0; padding: 1rem 0 0; border-top: 1px solid var(--line); border-left: 0; }
+        .workflow { grid-template-columns: 1fr; }
+        .workflow-step { border-right: 0; border-bottom: 1px solid var(--line); }
+        .workflow-step:last-child { border-bottom: 0; }
+        .panel { padding: 1.2rem; }
+        .result-grid { grid-template-columns: 1fr; }
+        .result-stat { border-right: 0; border-bottom: 1px solid var(--line); }
+        .result-stat:last-child { border-bottom: 0; }
     }
 </style>
-""", unsafe_allow_html=True)
-
-# ── Шапка ──
-st.markdown("""
-<div class="brand-bar">
-    <img src="https://sks-lombard.ru/local/templates/sks-lombard/assets/images/favicon/icon1.ico"
-         class="brand-logo" alt="СКС">
-    <div class="brand-text">
-        <h1>СКС Ломбард</h1>
-        <div class="sub">Предварительная оценка ювелирных изделий по фотографиям</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-if not settings.ai_enabled:
-    st.info("Режим демонстрации: подключите Yandex Cloud AI Studio, чтобы включить анализ фотографий.")
-
-
-# ── Вспомогательные функции ──
-def _conf_badge(conf: str) -> str:
-    mapping = {
-        "высокая": ("conf-high",   "высокая точность"),
-        "средняя": ("conf-medium", "средняя точность"),
-        "низкая":  ("conf-low",    "низкая точность"),
-    }
-    cls, label = mapping.get(conf, ("conf-na", "нет данных"))
-    return f'<span class="conf {cls}">{label}</span>'
-
-
-def _fmt(value) -> str:
-    if value is None:
-        return "—"
-    return f"{int(value):,}".replace(",", "\u2009") + " ₽"
+""",
+    unsafe_allow_html=True,
+)
 
 
 def _safe_html(value: object) -> str:
     return escape(str(value), quote=True)
+
+
+def _fmt(value: int | float | None) -> str:
+    if value is None:
+        return "—"
+    return f"{int(value):,}".replace(",", "\u2009") + " ₽"
 
 
 def _normalize_phone(value: str) -> str | None:
@@ -288,148 +390,137 @@ def _validate_photos(photos) -> str | None:
         return "Загрузите хотя бы одну фотографию изделия."
     if len(photos) > 4:
         return "Можно загрузить не более четырёх фотографий."
-    max_size = 8 * 1024 * 1024
-    if any(photo.size > max_size for photo in photos):
+    if any(photo.size > 8 * 1024 * 1024 for photo in photos):
         return "Размер каждого файла не должен превышать 8 МБ."
     return None
 
 
-# ── Константы ──
+def _confidence_badge(confidence: str) -> str:
+    mapping = {
+        "высокая": ("conf-high", "высокая точность"),
+        "средняя": ("conf-medium", "средняя точность"),
+        "низкая": ("conf-low", "низкая точность"),
+    }
+    css_class, label = mapping.get(confidence, ("conf-na", "нет данных"))
+    return f'<span class="conf {css_class}">{label}</span>'
+
+
 BRANCHES = [
-    {"name": "СКС Ломбард — Центральный",   "address": "Революционная ул., 52",       "city": "Уфа"},
-    {"name": "СКС Ломбард — Октябрьский",       "address": "просп. Октября, 160",        "city": "Уфа"},
-    {"name": "СКС Ломбард — Зелёная Роща",          "address": "ул. Степана Кувыкина, 1Г",      "city": "Уфа"},
-    {"name": "СКС Ломбард — Дема",       "address": "ул. Правды, 20", "city": "Уфа"},
+    {"name": "СКС Ломбард — Центральный", "address": "Революционная ул., 52"},
+    {"name": "СКС Ломбард — Октябрьский", "address": "просп. Октября, 160"},
+    {"name": "СКС Ломбард — Зелёная Роща", "address": "ул. Степана Кувыкина, 1Г"},
+    {"name": "СКС Ломбард — Дема", "address": "ул. Правды, 20"},
 ]
 
-@st.dialog("⚠️ Важная информация")
-def show_disclaimer():
-    st.markdown("""
-    **Расчёт является предварительным** и выполнен на основании фотографий
-    и предоставленных данных.
 
-    - Вес, определённый по фотографии, носит **оценочный характер**.
-    - Окончательная оценка определяется **специалистом** после очного
-      осмотра в подразделении компании.
-    - Итоговые суммы займа и выкупа могут отличаться от предварительного расчёта.
-    """)
-    if st.button("Понятно, продолжить", type="primary"):
+@st.dialog("Перед началом")
+def show_disclaimer():
+    st.markdown("### Важная информация")
+    st.write("Расчёт является предварительным и основан на фотографиях и указанных данных.")
+    st.markdown(
+        "- Оценка веса по фотографии приблизительна.\n"
+        "- Окончательное решение и сумма определяются товароведом после осмотра.\n"
+        "- Условия займа и выкупа могут отличаться от расчёта."
+    )
+    if st.button("Понятно, продолжить", type="primary", use_container_width=True):
         st.session_state["disclaimer_accepted"] = True
         st.rerun()
 
 
+def _create_lead(name: str, phone: str, branch: dict | None = None) -> dict:
+    analysis = st.session_state.get("last_analysis", {})
+    if branch:
+        analysis = {**analysis, "branch_name": branch["name"], "branch_address": branch["address"]}
+    return create_deal(
+        client_name=name,
+        client_phone=phone,
+        analysis=analysis,
+        price=st.session_state.get("last_price", {}),
+        prob=st.session_state.get("last_prob", {}),
+        photos_count=st.session_state.get("last_photos_count", 0),
+    )
+
+
+def _store_lead_result(result: dict, lead_type: str, branch_name: str | None = None) -> None:
+    st.session_state["deal_created"] = True
+    st.session_state["deal_id"] = result["deal_id"]
+    st.session_state["deal_type"] = lead_type
+    st.session_state["deal_mode"] = result["mode"]
+    if branch_name:
+        st.session_state["deal_branch"] = branch_name
+    st.session_state["open_dialog"] = None
+    st.rerun()
+
+
 @st.dialog("Заказать обратный звонок")
 def dialog_callback():
-    analysis     = st.session_state.get("last_analysis", {})
-    price        = st.session_state.get("last_price", {})
-    prob         = st.session_state.get("last_prob", {})
-    photos_count = st.session_state.get("last_photos_count", 0)
+    st.caption("Оставьте контакт — специалист свяжется с вами в рабочее время.")
+    name = st.text_input("Ваше имя *", placeholder="Иван Иванов", key="callback_name")
+    phone = st.text_input("Телефон *", placeholder="+7 (999) 123-45-67", key="callback_phone")
+    consent = st.checkbox("Согласен на обработку контактных данных *", key="callback_consent")
 
-    st.markdown("Оставьте контакты — специалист свяжется с вами в рабочее время.")
-    name = st.text_input("ФИО *", placeholder="Иванов Иван Иванович", key="callback_name")
-    phone = st.text_input("Номер телефона *", placeholder="+7 (___) ___-__-__", key="callback_phone")
-    consent = st.checkbox(
-        "Согласен на обработку контактных данных для обратного звонка *",
-        key="callback_consent",
-    )
+    submit_col, cancel_col = st.columns(2)
+    with submit_col:
+        submitted = st.button("Отправить", type="primary", use_container_width=True)
+    with cancel_col:
+        cancelled = st.button("Отмена", use_container_width=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Отправить заявку", type="primary"):
-            normalized_phone = _normalize_phone(phone)
-            if not name.strip():
-                st.error("Пожалуйста, укажите ФИО.")
-            elif not normalized_phone:
-                st.error("Укажите номер в формате +7 (999) 123-45-67.")
-            elif not consent:
-                st.error("Подтвердите согласие на обработку контактных данных.")
+    if cancelled:
+        st.session_state["open_dialog"] = None
+        st.rerun()
+    if submitted:
+        normalized_phone = _normalize_phone(phone)
+        if not name.strip():
+            st.error("Укажите имя.")
+        elif not normalized_phone:
+            st.error("Укажите номер в формате +7 (999) 123-45-67.")
+        elif not consent:
+            st.error("Подтвердите согласие на обработку контактных данных.")
+        else:
+            result = _create_lead(name.strip(), normalized_phone)
+            if result["success"]:
+                _store_lead_result(result, "callback")
             else:
-                result = create_deal(
-                    client_name=name.strip(),
-                    client_phone=normalized_phone,
-                    analysis=analysis,
-                    price=price,
-                    prob=prob,
-                    photos_count=photos_count,
-                )
-                if result["success"]:
-                    st.session_state["deal_created"] = True
-                    st.session_state["deal_id"] = result["deal_id"]
-                    st.session_state["deal_type"] = "callback"
-                    st.session_state["deal_mode"] = result["mode"]
-                    st.session_state["open_dialog"] = None
-                    st.rerun()
-                else:
-                    st.error(result["message"])
-    with col2:
-        if st.button("Отмена"):
-            st.session_state["open_dialog"] = None
-            st.rerun()
+                st.error(result["message"])
 
 
-@st.dialog("Выбрать подразделение", width="large")
+@st.dialog("Выбрать отделение", width="large")
 def dialog_branch():
-    analysis     = st.session_state.get("last_analysis", {})
-    price        = st.session_state.get("last_price", {})
-    prob         = st.session_state.get("last_prob", {})
-    photos_count = st.session_state.get("last_photos_count", 0)
-
-    st.markdown("Выберите удобное подразделение и оставьте контакты.")
-
-    branch_names = [f"{b['name']} — {b['address']}" for b in BRANCHES]
-    selected_idx = st.radio(
-        "Подразделения",
-        range(len(branch_names)),
-        format_func=lambda i: branch_names[i],
+    st.caption("Выберите удобное отделение и оставьте контакт для подтверждения визита.")
+    choice = st.radio(
+        "Отделение",
+        options=range(len(BRANCHES)),
+        format_func=lambda index: f"{BRANCHES[index]['name']} · {BRANCHES[index]['address']}",
+        label_visibility="collapsed",
     )
+    name = st.text_input("Ваше имя *", placeholder="Иван Иванов", key="branch_name")
+    phone = st.text_input("Телефон *", placeholder="+7 (999) 123-45-67", key="branch_phone")
+    consent = st.checkbox("Согласен на обработку контактных данных *", key="branch_consent")
 
-    st.markdown("---")
-    name = st.text_input("ФИО *", placeholder="Иванов Иван Иванович", key="branch_name")
-    phone = st.text_input("Номер телефона *", placeholder="+7 (___) ___-__-__", key="branch_phone")
-    consent = st.checkbox(
-        "Согласен на обработку контактных данных для записи *",
-        key="branch_consent",
-    )
+    submit_col, cancel_col = st.columns(2)
+    with submit_col:
+        submitted = st.button("Записаться", type="primary", use_container_width=True)
+    with cancel_col:
+        cancelled = st.button("Отмена", use_container_width=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Посетить это подразделение", type="primary"):
-            normalized_phone = _normalize_phone(phone)
-            if not name.strip():
-                st.error("Пожалуйста, укажите ФИО.")
-            elif not normalized_phone:
-                st.error("Укажите номер в формате +7 (999) 123-45-67.")
-            elif not consent:
-                st.error("Подтвердите согласие на обработку контактных данных.")
+    if cancelled:
+        st.session_state["open_dialog"] = None
+        st.rerun()
+    if submitted:
+        normalized_phone = _normalize_phone(phone)
+        if not name.strip():
+            st.error("Укажите имя.")
+        elif not normalized_phone:
+            st.error("Укажите номер в формате +7 (999) 123-45-67.")
+        elif not consent:
+            st.error("Подтвердите согласие на обработку контактных данных.")
+        else:
+            branch = BRANCHES[choice]
+            result = _create_lead(name.strip(), normalized_phone, branch)
+            if result["success"]:
+                _store_lead_result(result, "branch", branch["name"])
             else:
-                branch = BRANCHES[selected_idx]
-                enriched_analysis = {
-                    **analysis,
-                    "branch_name": branch["name"],
-                    "branch_address": branch["address"],
-                }
-                result = create_deal(
-                    client_name=name.strip(),
-                    client_phone=normalized_phone,
-                    analysis=enriched_analysis,
-                    price=price,
-                    prob=prob,
-                    photos_count=photos_count,
-                )
-                if result["success"]:
-                    st.session_state["deal_created"] = True
-                    st.session_state["deal_id"] = result["deal_id"]
-                    st.session_state["deal_type"] = "branch"
-                    st.session_state["deal_branch"] = branch["name"]
-                    st.session_state["deal_mode"] = result["mode"]
-                    st.session_state["open_dialog"] = None
-                    st.rerun()
-                else:
-                    st.error(result["message"])
-    with col2:
-        if st.button("Отмена"):
-            st.session_state["open_dialog"] = None
-            st.rerun()
+                st.error(result["message"])
 
 
 if not st.session_state.get("disclaimer_accepted", False):
@@ -439,259 +530,245 @@ elif st.session_state.get("open_dialog") == "callback":
 elif st.session_state.get("open_dialog") == "branch":
     dialog_branch()
 
+st.markdown(
+    """
+<header class="topbar">
+    <div class="wordmark"><span class="wordmark-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.5 21.5 12 12 21.5 2.5 12 12 2.5Zm0 4.1L6.6 12l5.4 5.4 5.4-5.4L12 6.6Z"/></svg></span>СКС ЛОМБАРД</div>
+    <div class="topbar-note">Уфа · Предварительная онлайн-оценка</div>
+</header>
+<section class="hero">
+    <div>
+        <p class="eyebrow">Оценка по фотографии</p>
+        <h1>Узнайте сумму<br><em>до визита</em> в ломбард</h1>
+        <p class="hero-copy">Загрузите фотографии украшения. Мы оценим его состояние, рассчитаем ориентировочную сумму займа и поможем выбрать следующий шаг.</p>
+    </div>
+    <aside class="trust-list" aria-label="Преимущества сервиса">
+        <div class="trust-item"><strong>До 4 фотографий</strong>для более точной оценки</div>
+        <div class="trust-item"><strong>Расчёт за минуту</strong>без визита в отделение</div>
+        <div class="trust-item"><strong>Без обязательств</strong>итог решает товаровед</div>
+    </aside>
+</section>
+<div class="workflow" aria-label="Как это работает">
+    <div class="workflow-step"><span class="step-index">1</span>Добавьте фотографии</div>
+    <div class="workflow-step"><span class="step-index">2</span>Получите расчёт</div>
+    <div class="workflow-step"><span class="step-index">3</span>Выберите удобный способ связи</div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
-# ── Основной интерфейс ──
-left, right = st.columns([1, 1], gap="large")
+if not settings.ai_enabled:
+    st.info("Демонстрационный режим: AI-анализ станет доступен после подключения Yandex Cloud AI Studio.")
 
-with left:
-    st.markdown('<div class="card"><h3>Данные изделия</h3>', unsafe_allow_html=True)
-    with st.form("jewelry_form"):
+form_column, result_column = st.columns([1.04, 0.96], gap="large")
+
+with form_column:
+    st.markdown(
+        """
+<section class="panel">
+    <div class="panel-heading">
+        <div><h2 class="panel-title">Расскажите об украшении</h2><p class="panel-caption">Чем точнее исходные данные, тем полезнее предварительный расчёт.</p></div>
+        <span class="panel-index">01 / 02</span>
+    </div>
+""",
+        unsafe_allow_html=True,
+    )
+    with st.form("jewelry_form", clear_on_submit=False):
+        st.markdown('<div class="form-section-label">Фотографии</div>', unsafe_allow_html=True)
         photos = st.file_uploader(
             "Фотографии изделия *",
             type=["jpg", "jpeg", "png"],
             accept_multiple_files=True,
-            help="Загрузите 1–4 фотографии при хорошем освещении. Размер каждого файла — до 8 МБ.",
+            help="От 1 до 4 фотографий, до 8 МБ каждая. Покажите изделие целиком и крупные детали.",
         )
-        c1, c2 = st.columns(2)
-        with c1:
-            item_type = st.selectbox("Тип изделия",
-                                     ["Кольцо","Серьги","Браслет","Кулон","Цепь","Колье"])
-            sample    = st.selectbox("Проба металла", ["375","585","750"])
-        with c2:
-            condition = st.selectbox("Состояние", ["Как новое","Среднее","Плохое"])
-            weight    = st.number_input(
-                "Вес изделия, г (если известен)",
-                min_value=0.0, step=0.1,
-                help="Если вес неизвестен — оставьте 0, ИИ оценит его по фото.",
-            )
-        has_inserts = st.radio("Наличие вставок", ["Нет","Да"], horizontal=True) == "Да"
-        submitted   = st.form_submit_button("Оценить изделие")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-with right:
+        st.markdown('<div class="form-section-label">Характеристики</div>', unsafe_allow_html=True)
+        left_field, right_field = st.columns(2)
+        with left_field:
+            item_type = st.selectbox("Тип изделия", ["Кольцо", "Серьги", "Браслет", "Кулон", "Цепь", "Колье"])
+            condition = st.selectbox("Визуальное состояние", ["Как новое", "Среднее", "Плохое"])
+        with right_field:
+            sample = st.selectbox("Проба металла", ["375", "585", "750"], index=1)
+            weight = st.number_input("Вес, г — если известен", min_value=0.0, step=0.1, help="Если вес неизвестен, оставьте 0 — сервис попробует оценить его по фото.")
+        has_inserts = st.radio("Есть вставки или камни?", ["Нет", "Да"], horizontal=True) == "Да"
+        st.markdown("<br>", unsafe_allow_html=True)
+        submitted = st.form_submit_button("Рассчитать предварительную сумму", type="primary", use_container_width=True)
     photo_error = _validate_photos(photos) if submitted else None
     if photo_error:
-        st.error(photo_error)
+        st.error(f"Не удалось начать расчёт: {photo_error} Исправьте это и попробуйте снова.")
+    st.markdown("</section>", unsafe_allow_html=True)
+    st.caption("Отправляя фотографии, вы соглашаетесь с предварительным характером оценки. Финальное решение принимает специалист после осмотра.")
+
+with result_column:
+    if photo_error:
+        st.markdown(
+            """
+<aside class="result-empty">
+    <div class="result-empty-number">!</div>
+    <h2>Добавьте фотографии для расчёта</h2>
+    <p>После исправления данных здесь появится предварительная оценка и следующие действия.</p>
+</aside>
+""",
+            unsafe_allow_html=True,
+        )
     elif not submitted and "last_analysis" not in st.session_state:
         st.markdown(
-            '<div class="card"><h3>Результат оценки</h3>'
-            '<p style="color:#6b7280;">Заполните данные изделия и нажмите '
-            '«Оценить изделие», чтобы получить предварительный расчёт.</p></div>',
+            """
+<aside class="result-empty">
+    <div class="result-empty-number">01</div>
+    <h2>Ваш расчёт появится здесь</h2>
+    <p>Добавьте фотографии и характеристики изделия. Сервис покажет ориентировочную сумму и важные детали оценки.</p>
+</aside>
+""",
             unsafe_allow_html=True,
         )
     else:
-        # При новой отправке формы — пересчитываем и сбрасываем сделку
         if submitted:
-            st.session_state.pop("deal_created", None)
-            st.session_state.pop("deal_id", None)
-            st.session_state.pop("deal_type", None)
-            st.session_state.pop("deal_mode", None)
-            st.session_state.pop("deal_branch", None)
-            st.session_state.pop("open_dialog", None)
+            for key in ("deal_created", "deal_id", "deal_type", "deal_mode", "deal_branch", "open_dialog"):
+                st.session_state.pop(key, None)
 
             form_data = {
-                "type":        item_type,
-                "sample":      sample,
+                "type": item_type,
+                "sample": sample,
                 "has_inserts": has_inserts,
-                "condition":   condition,
-                "weight_g":    weight if weight > 0 else None,
+                "condition": condition,
+                "weight_g": weight if weight > 0 else None,
             }
-            img_bytes = [photo.getvalue() for photo in photos]
+            image_bytes = [photo.getvalue() for photo in photos]
+            with st.spinner("Проверяем фотографии и считаем сумму…"):
+                analysis = analyze_jewelry(image_bytes, form_data)
 
-            with st.spinner("Анализируем изделие..."):
-                analysis = analyze_jewelry(img_bytes, form_data)
+            final_weight = weight if weight > 0 else (analysis.get("estimated_weight_g") or 0)
+            price = calculate_price(
+                {
+                    "item_type": analysis["type"],
+                    "fineness": sample,
+                    "has_inserts": analysis["has_inserts"],
+                    "condition": analysis["condition"],
+                    "weight": final_weight,
+                }
+            )
+            probability = acceptance_probability(
+                {
+                    "condition": analysis["condition"],
+                    "has_inserts": analysis["has_inserts"],
+                    "weight": final_weight,
+                    "has_defects": analysis.get("has_defects", False),
+                    "insert_damage": analysis.get("insert_damage", False),
+                    "defects_description": analysis.get("defects_description", ""),
+                    "defect_severity": analysis.get("defect_severity", "нет"),
+                    "repairable": analysis.get("repairable", True),
+                }
+            )
+            st.session_state.update(
+                {
+                    "last_analysis": analysis,
+                    "last_price": price,
+                    "last_prob": probability,
+                    "last_photos_count": len(image_bytes),
+                    "last_weight_is_est": weight <= 0,
+                    "last_final_weight": final_weight,
+                    "last_photos_bytes": image_bytes,
+                }
+            )
 
-            final_weight        = weight if weight > 0 else (analysis.get("estimated_weight_g") or 0)
-            weight_is_estimated = weight <= 0
-
-            price = calculate_price({
-                "item_type":   analysis["type"],
-                "fineness":    sample,
-                "has_inserts": analysis["has_inserts"],
-                "condition":   analysis["condition"],
-                "weight":      final_weight,
-            })
-            prob = acceptance_probability({
-                "condition":           analysis["condition"],
-                "has_inserts":         analysis["has_inserts"],
-                "weight":              final_weight,
-                "has_defects":         analysis.get("has_defects", False),
-                "insert_damage":       analysis.get("insert_damage", False),
-                "defects_description": analysis.get("defects_description", ""),
-                "defect_severity":     analysis.get("defect_severity", "нет"),
-                "repairable":          analysis.get("repairable", True),
-            })
-
-            # Сохраняем всё в session_state
-            st.session_state["last_analysis"]        = analysis
-            st.session_state["last_price"]           = price
-            st.session_state["last_prob"]            = prob
-            st.session_state["last_photos_count"]    = len(img_bytes)
-            st.session_state["last_weight_is_est"]   = weight_is_estimated
-            st.session_state["last_final_weight"]    = final_weight
-            st.session_state["last_photos_bytes"] = img_bytes
-
-        # Читаем из session_state (работает и после rerun без повторной отправки)
-        analysis            = st.session_state["last_analysis"]
-        price               = st.session_state["last_price"]
-        prob                = st.session_state["last_prob"]
+        analysis = st.session_state["last_analysis"]
+        price = st.session_state["last_price"]
+        probability = st.session_state["last_prob"]
+        final_weight = st.session_state.get("last_final_weight", 0)
         weight_is_estimated = st.session_state.get("last_weight_is_est", False)
-        final_weight        = st.session_state.get("last_final_weight", 0)
         photos_bytes = st.session_state.get("last_photos_bytes", [])
+        score = probability["probability"]
+        badge_class = "badge-high" if score >= 80 else "badge-medium" if score >= 50 else "badge-low"
+        source_label = "Анализ фотографий" if analysis.get("analysis_source") == "ai" else "Расчёт по анкете"
+        weight_label = "оценка по фото" if weight_is_estimated else "указано вами"
+        buyout = (
+            f"{_fmt(price['buyout_amount'])} + {price['daily_interest_rate']:g}% / день"
+            if price["buyout_amount"] is not None else "Нужен вес"
+        )
 
-        # ── Карточка результата ──
-        st.markdown('<div class="card"><h3>Результат оценки</h3>', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+<section class="result-card">
+    <div class="result-main">
+        <p class="result-kicker">Предварительная сумма займа · {source_label}</p>
+        <p class="result-value">{_fmt(price['loan_amount'])}</p>
+        <p class="result-subtitle">Окончательная сумма зависит от осмотра товара и условий в отделении.</p>
+    </div>
+    <div class="result-grid">
+        <div class="result-stat"><span class="result-stat-label">Вес · {weight_label}</span><span class="result-stat-value">{final_weight:g} г</span></div>
+        <div class="result-stat"><span class="result-stat-label">Цена за грамм</span><span class="result-stat-value">{price['price_per_gram']:,} ₽</span></div>
+        <div class="result-stat"><span class="result-stat-label">Выкуп</span><span class="result-stat-value">{buyout}</span></div>
+    </div>
+    <div class="result-insight"><p>Вероятность рассмотрения: <span class="badge {badge_class}">{_safe_html(probability['verdict'])} · {score}%</span></p></div>
+</section>
+""",
+            unsafe_allow_html=True,
+        )
 
         if analysis.get("analysis_source") == "form":
-            st.warning(
-                "AI-анализ недоступен: показан расчёт только по данным анкеты. "
-                "Для оценки по фотографии повторите попытку позже."
-            )
-        else:
-            st.caption("AI-анализ выполнен по фотографиям. Окончательное решение принимает товаровед.")
-
-        weight_display = f"{final_weight:g} г" if final_weight else "—"
-        weight_label = "Вес (оценка по фото)" if weight_is_estimated else "Вес изделия"
-        ppg = f"{price['price_per_gram']:,}".replace(",", "\u2009")
-        buyout_label = (
-            f"{_fmt(price['buyout_amount'])} + {price['daily_interest_rate']:g}%/день"
-            if price["buyout_amount"] is not None else "—"
-        )
-
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(
-            f'<div class="metric-box"><div class="label">{weight_label}</div>'
-            f'<div class="value">{weight_display}</div></div>',
-            unsafe_allow_html=True,
-        )
-        m2.markdown(
-            f'<div class="metric-box"><div class="label">Цена за грамм</div>'
-            f'<div class="value">{ppg} ₽</div></div>',
-            unsafe_allow_html=True,
-        )
-        m3.markdown(
-            f'<div class="metric-box"><div class="label">Сумма займа</div>'
-            f'<div class="value">{_fmt(price["loan_amount"])}</div></div>',
-            unsafe_allow_html=True,
-        )
-        m4.markdown(
-            f'<div class="metric-box"><div class="label">Сумма выкупа</div>'
-            f'<div class="value" style="font-size:1rem; word-break:break-word; hyphens:auto;">{buyout_label}</div></div>',
-            unsafe_allow_html=True,
-        )
-
-        if price["loan_amount"] is not None:
+            st.warning("AI-анализ временно недоступен: показан расчёт только по данным анкеты. Для оценки по фотографии повторите попытку позже.")
+        elif weight_is_estimated and final_weight:
+            minimum, maximum = analysis.get("weight_min_g"), analysis.get("weight_max_g")
+            range_text = f" Диапазон: {minimum:g}–{maximum:g} г." if minimum and maximum else ""
             st.markdown(
-                '<p style="font-size:.8rem;color:#888;margin-top:.5rem;">'
-                '* Сумма займа — средства, выдаваемые клиенту. '
-                'Сумма выкупа — сумма для возврата изделия (займ + проценты). '
-                'Точные условия уточняйте у специалиста.</p>',
+                f'<p class="panel-caption">Вес определён по фотографии · '
+                f'{_confidence_badge(analysis.get("weight_confidence", "низкая"))}{range_text}</p>',
                 unsafe_allow_html=True,
             )
+        elif weight_is_estimated:
+            st.warning("Не удалось оценить вес по фотографии. Укажите фактический вес, чтобы получить сумму.")
 
-        if weight_is_estimated and final_weight:
-            conf    = analysis.get("weight_confidence", "низкая")
-            w_min   = analysis.get("weight_min_g")
-            w_max   = analysis.get("weight_max_g")
-            rng_txt = f" Диапазон: {w_min:g}–{w_max:g} г." if w_min and w_max else ""
-            st.markdown(
-                f'<div class="weight-note"> Вес определён по фотографии '
-                f'{_conf_badge(conf)}.{rng_txt} '
-                f'{_safe_html(analysis.get("weight_reasoning", ""))}</div>',
-                unsafe_allow_html=True,
-            )
+        if probability["reasons"]:
+            with st.expander("Что повлияло на расчёт", expanded=False):
+                st.markdown('<div class="reason-list">', unsafe_allow_html=True)
+                for reason in probability["reasons"]:
+                    st.markdown(f'<div class="reason-item">{_safe_html(reason)}</div>', unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-        score     = prob["probability"]
-        badge_cls = "badge-high" if score >= 80 else ("badge-medium" if score >= 50 else "badge-low")
-        st.markdown(
-            f'<p style="margin-top:1.2rem;">Вероятность принятия: '
-            f'<span class="badge {badge_cls}">{prob["verdict"]} — {score}%</span></p>',
-            unsafe_allow_html=True,
-        )
-
-        if prob["reasons"]:
-            st.markdown("**Замечания:**")
-            for r in prob["reasons"]:
-                st.markdown(f'<div class="reason-item">{_safe_html(r)}</div>', unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        with st.expander("Подробности анализа ИИ"):
-            a1, a2 = st.columns(2)
-            a1.write(f"**Тип изделия:** {analysis['type']}")
-            a1.write(f"**Состояние:** {analysis['condition']}")
-            a1.write(f"**Вставки:** {'Да' if analysis['has_inserts'] else 'Нет'}")
-            a2.write(f"**Дефекты:** {'Да' if analysis['has_defects'] else 'Нет'}")
-            a2.write(f"**Повреждение вставок:** {'Да' if analysis['insert_damage'] else 'Нет'}")
-            a2.write(f"**Серьёзность дефектов:** {analysis.get('defect_severity','—')}")
-            a2.write(f"**Ремонтопригодно:** {'Да' if analysis.get('repairable', True) else 'Нет'}")
-            st.write(f"**Описание дефектов:** {analysis['defects_description']}")
-            st.write(f"**Визуальные заметки:** {analysis['visual_notes']}")
-            st.markdown("---")
-            st.markdown("**Оценка веса**")
-            w1, w2 = st.columns(2)
-            w1.write(f"**Источник:** {analysis.get('weight_source','—')}")
-            w1.write(f"**Оценочный вес:** {analysis.get('estimated_weight_g') or '—'} г")
-            w2.write(f"**Диапазон:** {analysis.get('weight_min_g') or '—'}–{analysis.get('weight_max_g') or '—'} г")
-            w2.write(f"**Уверенность:** {analysis.get('weight_confidence','—')}")
-            st.write(f"**Обоснование веса:** {analysis.get('weight_reasoning','—')}")
+        with st.expander("Детали оценки", expanded=False):
+            info_left, info_right = st.columns(2)
+            info_left.write(f"**Тип:** {analysis['type']}")
+            info_left.write(f"**Состояние:** {analysis['condition']}")
+            info_left.write(f"**Вставки:** {'Да' if analysis['has_inserts'] else 'Нет'}")
+            info_right.write(f"**Дефекты:** {'Есть' if analysis['has_defects'] else 'Не выявлены'}")
+            info_right.write(f"**Серьёзность:** {analysis.get('defect_severity', '—')}")
+            info_right.write(f"**Ремонтопригодно:** {'Да' if analysis.get('repairable', True) else 'Нет'}")
+            st.write(f"**Комментарий:** {analysis.get('visual_notes', '—')}")
+            st.write(f"**Обоснование веса:** {analysis.get('weight_reasoning', '—')}")
 
         if photos_bytes:
-            with st.expander("Загруженные фотографии"):
-                cols = st.columns(min(len(photos_bytes), 4))
-                for i, image_bytes in enumerate(photos_bytes):
-                    cols[i % len(cols)].image(image_bytes)
+            with st.expander("Загруженные фотографии", expanded=False):
+                image_columns = st.columns(min(len(photos_bytes), 4))
+                for index, image in enumerate(photos_bytes):
+                    image_columns[index % len(image_columns)].image(image, use_container_width=True)
 
-        if weight_is_estimated:
-            if final_weight:
-                st.warning(
-                    "Вес рассчитан автоматически по фотографии и является "
-                    "приблизительным. Для точной суммы укажите фактический вес."
-                )
-            else:
-                st.error(
-                    "Не удалось оценить вес по фотографии. "
-                    "Укажите вес вручную для расчёта стоимости."
-                )
-
-        st.caption("Окончательная оценка — после очного осмотра специалистом.")
-
-        # ── Конвертация в обращение ──
-        st.markdown('<div class="convert-section">', unsafe_allow_html=True)
-        st.markdown("### Оформить обращение")
         st.markdown(
-            "Готовы прийти в ломбард или хотите получить консультацию? "
-            "Выберите удобный способ — специалист свяжется с вами."
+            """
+<section class="lead-card">
+    <h3>Продолжим в удобном формате?</h3>
+    <p>Выберите отделение для визита или оставьте номер — специалист поможет уточнить условия.</p>
+</section>
+""",
+            unsafe_allow_html=True,
         )
 
         if st.session_state.get("deal_created"):
-            deal_type = st.session_state.get("deal_type", "")
-            deal_branch = st.session_state.get("deal_branch", "")
-            deal_id = st.session_state.get("deal_id", "")
-            is_demo = st.session_state.get("deal_mode") == "demo"
+            deal_type = st.session_state.get("deal_type")
+            deal_id = st.session_state.get("deal_id")
             if deal_type == "branch":
-                st.success(
-                    f"Заявка #{deal_id} создана! Ждём вас: **{deal_branch}**. "
-                    f"Специалист может связаться с вами для подтверждения."
-                )
+                st.success(f"Заявка #{deal_id} создана. Ждём вас: {st.session_state.get('deal_branch')}.")
             else:
-                st.success(
-                    f"Заявка #{deal_id} создана! Специалист свяжется с вами "
-                    f"в ближайшее рабочее время."
-                )
-            if is_demo:
-                st.info("Демо-режим: обращение показано только в интерфейсе и не отправлялось в CRM.")
+                st.success(f"Заявка #{deal_id} создана. Специалист свяжется с вами в рабочее время.")
+            if st.session_state.get("deal_mode") == "demo":
+                st.info("Демо-режим: обращение показано в интерфейсе и не было отправлено в CRM.")
         else:
-            btn1, btn2 = st.columns(2)
-            with btn1:
-                # Кнопка только выставляет флаг — диалог откроется при следующем rerun
-                if st.button("Выбрать подразделение", key="btn_branch"):
+            visit_button, callback_button = st.columns(2)
+            with visit_button:
+                if st.button("Выбрать отделение", key="choose_branch", use_container_width=True):
                     st.session_state["open_dialog"] = "branch"
                     st.rerun()
-            with btn2:
-                if st.button("Заказать обратный звонок", key="btn_callback"):
+            with callback_button:
+                if st.button("Заказать звонок", key="request_callback", use_container_width=True):
                     st.session_state["open_dialog"] = "callback"
                     st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
+""
