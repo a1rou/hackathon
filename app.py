@@ -1,8 +1,12 @@
 # app.py
+import re
+from html import escape
+
 import streamlit as st
 from analyzer import analyze_jewelry
-from pricing  import calculate_price, acceptance_probability
-from bitrix   import create_deal
+from bitrix import create_deal
+from config import settings
+from pricing import acceptance_probability, calculate_price
 
 st.set_page_config(
     page_title="СКС Ломбард — Оценка ювелирных изделий",
@@ -245,6 +249,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+if not settings.ai_enabled:
+    st.info("Режим демонстрации: подключите Yandex Cloud AI Studio, чтобы включить анализ фотографий.")
+
 
 # ── Вспомогательные функции ──
 def _conf_badge(conf: str) -> str:
@@ -261,6 +268,30 @@ def _fmt(value) -> str:
     if value is None:
         return "—"
     return f"{int(value):,}".replace(",", "\u2009") + " ₽"
+
+
+def _safe_html(value: object) -> str:
+    return escape(str(value), quote=True)
+
+
+def _normalize_phone(value: str) -> str | None:
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith(("7", "8")):
+        return "+7" + digits[1:]
+    if len(digits) == 10:
+        return "+7" + digits
+    return None
+
+
+def _validate_photos(photos) -> str | None:
+    if not photos:
+        return "Загрузите хотя бы одну фотографию изделия."
+    if len(photos) > 4:
+        return "Можно загрузить не более четырёх фотографий."
+    max_size = 8 * 1024 * 1024
+    if any(photo.size > max_size for photo in photos):
+        return "Размер каждого файла не должен превышать 8 МБ."
+    return None
 
 
 # ── Константы ──
@@ -295,34 +326,41 @@ def dialog_callback():
     photos_count = st.session_state.get("last_photos_count", 0)
 
     st.markdown("Оставьте контакты — специалист свяжется с вами в рабочее время.")
-    name  = st.text_input("ФИО *",           placeholder="Иванов Иван Иванович")
-    phone = st.text_input("Номер телефона *", placeholder="+7 (___) ___-__-__")
+    name = st.text_input("ФИО *", placeholder="Иванов Иван Иванович", key="callback_name")
+    phone = st.text_input("Номер телефона *", placeholder="+7 (___) ___-__-__", key="callback_phone")
+    consent = st.checkbox(
+        "Согласен на обработку контактных данных для обратного звонка *",
+        key="callback_consent",
+    )
 
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Отправить заявку", type="primary"):
+            normalized_phone = _normalize_phone(phone)
             if not name.strip():
                 st.error("Пожалуйста, укажите ФИО.")
-            elif not phone.strip():
-                st.error("Пожалуйста, укажите номер телефона.")
+            elif not normalized_phone:
+                st.error("Укажите номер в формате +7 (999) 123-45-67.")
+            elif not consent:
+                st.error("Подтвердите согласие на обработку контактных данных.")
             else:
                 result = create_deal(
                     client_name=name.strip(),
-                    client_phone=phone.strip(),
+                    client_phone=normalized_phone,
                     analysis=analysis,
                     price=price,
                     prob=prob,
                     photos_count=photos_count,
                 )
                 if result["success"]:
-                    # Сохраняем результат и закрываем диалог
-                    st.session_state["deal_created"]  = True
-                    st.session_state["deal_id"]       = result["deal_id"]
-                    st.session_state["deal_type"]     = "callback"
-                    st.session_state["open_dialog"]   = None   # закрыть диалог
+                    st.session_state["deal_created"] = True
+                    st.session_state["deal_id"] = result["deal_id"]
+                    st.session_state["deal_type"] = "callback"
+                    st.session_state["deal_mode"] = result["mode"]
+                    st.session_state["open_dialog"] = None
                     st.rerun()
                 else:
-                    st.error("Ошибка при создании заявки. Попробуйте позже.")
+                    st.error(result["message"])
     with col2:
         if st.button("Отмена"):
             st.session_state["open_dialog"] = None
@@ -346,40 +384,48 @@ def dialog_branch():
     )
 
     st.markdown("---")
-    name  = st.text_input("ФИО *",           placeholder="Иванов Иван Иванович")
-    phone = st.text_input("Номер телефона *", placeholder="+7 (___) ___-__-__")
+    name = st.text_input("ФИО *", placeholder="Иванов Иван Иванович", key="branch_name")
+    phone = st.text_input("Номер телефона *", placeholder="+7 (___) ___-__-__", key="branch_phone")
+    consent = st.checkbox(
+        "Согласен на обработку контактных данных для записи *",
+        key="branch_consent",
+    )
 
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Посетить это подразделение", type="primary"):
+            normalized_phone = _normalize_phone(phone)
             if not name.strip():
                 st.error("Пожалуйста, укажите ФИО.")
-            elif not phone.strip():
-                st.error("Пожалуйста, укажите номер телефона.")
+            elif not normalized_phone:
+                st.error("Укажите номер в формате +7 (999) 123-45-67.")
+            elif not consent:
+                st.error("Подтвердите согласие на обработку контактных данных.")
             else:
                 branch = BRANCHES[selected_idx]
                 enriched_analysis = {
                     **analysis,
-                    "branch_name":    branch["name"],
+                    "branch_name": branch["name"],
                     "branch_address": branch["address"],
                 }
                 result = create_deal(
                     client_name=name.strip(),
-                    client_phone=phone.strip(),
+                    client_phone=normalized_phone,
                     analysis=enriched_analysis,
                     price=price,
                     prob=prob,
                     photos_count=photos_count,
                 )
                 if result["success"]:
-                    st.session_state["deal_created"]  = True
-                    st.session_state["deal_id"]       = result["deal_id"]
-                    st.session_state["deal_type"]     = "branch"
-                    st.session_state["deal_branch"]   = branch["name"]
-                    st.session_state["open_dialog"]   = None   # закрыть диалог
+                    st.session_state["deal_created"] = True
+                    st.session_state["deal_id"] = result["deal_id"]
+                    st.session_state["deal_type"] = "branch"
+                    st.session_state["deal_branch"] = branch["name"]
+                    st.session_state["deal_mode"] = result["mode"]
+                    st.session_state["open_dialog"] = None
                     st.rerun()
                 else:
-                    st.error("Ошибка при создании заявки. Попробуйте позже.")
+                    st.error(result["message"])
     with col2:
         if st.button("Отмена"):
             st.session_state["open_dialog"] = None
@@ -401,10 +447,10 @@ with left:
     st.markdown('<div class="card"><h3>Данные изделия</h3>', unsafe_allow_html=True)
     with st.form("jewelry_form"):
         photos = st.file_uploader(
-            "Фотографии изделия",
+            "Фотографии изделия *",
             type=["jpg", "jpeg", "png"],
             accept_multiple_files=True,
-            help="Загрузите 1–4 фотографии при хорошем освещении.",
+            help="Загрузите 1–4 фотографии при хорошем освещении. Размер каждого файла — до 8 МБ.",
         )
         c1, c2 = st.columns(2)
         with c1:
@@ -424,7 +470,10 @@ with left:
 
 
 with right:
-    if not submitted and "last_analysis" not in st.session_state:
+    photo_error = _validate_photos(photos) if submitted else None
+    if photo_error:
+        st.error(photo_error)
+    elif not submitted and "last_analysis" not in st.session_state:
         st.markdown(
             '<div class="card"><h3>Результат оценки</h3>'
             '<p style="color:#6b7280;">Заполните данные изделия и нажмите '
@@ -435,10 +484,11 @@ with right:
         # При новой отправке формы — пересчитываем и сбрасываем сделку
         if submitted:
             st.session_state.pop("deal_created", None)
-            st.session_state.pop("deal_id",      None)
-            st.session_state.pop("deal_type",    None)
-            st.session_state.pop("deal_branch",  None)
-            st.session_state.pop("open_dialog",  None)
+            st.session_state.pop("deal_id", None)
+            st.session_state.pop("deal_type", None)
+            st.session_state.pop("deal_mode", None)
+            st.session_state.pop("deal_branch", None)
+            st.session_state.pop("open_dialog", None)
 
             form_data = {
                 "type":        item_type,
@@ -447,7 +497,7 @@ with right:
                 "condition":   condition,
                 "weight_g":    weight if weight > 0 else None,
             }
-            img_bytes = [p.read() for p in photos] if photos else []
+            img_bytes = [photo.getvalue() for photo in photos]
 
             with st.spinner("Анализируем изделие..."):
                 analysis = analyze_jewelry(img_bytes, form_data)
@@ -480,7 +530,7 @@ with right:
             st.session_state["last_photos_count"]    = len(img_bytes)
             st.session_state["last_weight_is_est"]   = weight_is_estimated
             st.session_state["last_final_weight"]    = final_weight
-            st.session_state["last_photos_objects"]  = photos  # для отображения
+            st.session_state["last_photos_bytes"] = img_bytes
 
         # Читаем из session_state (работает и после rerun без повторной отправки)
         analysis            = st.session_state["last_analysis"]
@@ -488,15 +538,26 @@ with right:
         prob                = st.session_state["last_prob"]
         weight_is_estimated = st.session_state.get("last_weight_is_est", False)
         final_weight        = st.session_state.get("last_final_weight", 0)
-        photos_objects      = st.session_state.get("last_photos_objects", [])
+        photos_bytes = st.session_state.get("last_photos_bytes", [])
 
         # ── Карточка результата ──
         st.markdown('<div class="card"><h3>Результат оценки</h3>', unsafe_allow_html=True)
 
+        if analysis.get("analysis_source") == "form":
+            st.warning(
+                "AI-анализ недоступен: показан расчёт только по данным анкеты. "
+                "Для оценки по фотографии повторите попытку позже."
+            )
+        else:
+            st.caption("AI-анализ выполнен по фотографиям. Окончательное решение принимает товаровед.")
+
         weight_display = f"{final_weight:g} г" if final_weight else "—"
-        weight_label   = "Вес (оценка по фото)" if weight_is_estimated else "Вес изделия"
-        ppg            = f"{price['price_per_gram']:,}".replace(",", "\u2009")
-        buyout_label = f"{price['buyout_amount']} + 0,29%/день"
+        weight_label = "Вес (оценка по фото)" if weight_is_estimated else "Вес изделия"
+        ppg = f"{price['price_per_gram']:,}".replace(",", "\u2009")
+        buyout_label = (
+            f"{_fmt(price['buyout_amount'])} + {price['daily_interest_rate']:g}%/день"
+            if price["buyout_amount"] is not None else "—"
+        )
 
         m1, m2, m3, m4 = st.columns(4)
         m1.markdown(
@@ -537,7 +598,7 @@ with right:
             st.markdown(
                 f'<div class="weight-note"> Вес определён по фотографии '
                 f'{_conf_badge(conf)}.{rng_txt} '
-                f'{analysis.get("weight_reasoning", "")}</div>',
+                f'{_safe_html(analysis.get("weight_reasoning", ""))}</div>',
                 unsafe_allow_html=True,
             )
 
@@ -552,7 +613,7 @@ with right:
         if prob["reasons"]:
             st.markdown("**Замечания:**")
             for r in prob["reasons"]:
-                st.markdown(f'<div class="reason-item">{r}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="reason-item">{_safe_html(r)}</div>', unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -576,11 +637,11 @@ with right:
             w2.write(f"**Уверенность:** {analysis.get('weight_confidence','—')}")
             st.write(f"**Обоснование веса:** {analysis.get('weight_reasoning','—')}")
 
-        if photos_objects:
+        if photos_bytes:
             with st.expander("Загруженные фотографии"):
-                cols = st.columns(min(len(photos_objects), 4))
-                for i, p in enumerate(photos_objects):
-                    cols[i % len(cols)].image(p)
+                cols = st.columns(min(len(photos_bytes), 4))
+                for i, image_bytes in enumerate(photos_bytes):
+                    cols[i % len(cols)].image(image_bytes)
 
         if weight_is_estimated:
             if final_weight:
@@ -605,9 +666,10 @@ with right:
         )
 
         if st.session_state.get("deal_created"):
-            deal_type   = st.session_state.get("deal_type", "")
+            deal_type = st.session_state.get("deal_type", "")
             deal_branch = st.session_state.get("deal_branch", "")
-            deal_id     = st.session_state.get("deal_id", "")
+            deal_id = st.session_state.get("deal_id", "")
+            is_demo = st.session_state.get("deal_mode") == "demo"
             if deal_type == "branch":
                 st.success(
                     f"Заявка #{deal_id} создана! Ждём вас: **{deal_branch}**. "
@@ -618,6 +680,8 @@ with right:
                     f"Заявка #{deal_id} создана! Специалист свяжется с вами "
                     f"в ближайшее рабочее время."
                 )
+            if is_demo:
+                st.info("Демо-режим: обращение показано только в интерфейсе и не отправлялось в CRM.")
         else:
             btn1, btn2 = st.columns(2)
             with btn1:
